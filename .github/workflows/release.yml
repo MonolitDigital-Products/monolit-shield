@@ -4,37 +4,58 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  release:
+    types: [published]
+
+# Fuerza permisos de escritura para el GITHUB_TOKEN solo en este workflow
+permissions:
+  contents: write
+
+env:
+  # Tag robusto para ambos disparadores (push tag y release published)
+  TAG_NAME: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref_name }}
 
 jobs:
   build:
+    name: Build distributable ZIP
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create artifact structure
+      - name: Create dist
         run: |
           mkdir -p dist
-          zip -r dist/monolit-shield-mu-${{ github.ref_name }}.zip mu-plugins server README.md README.es.md LICENSE .editorconfig .gitattributes
+          zip -r "dist/monolit-shield-mu-${TAG_NAME}.zip" \
+            mu-plugins \
+            server \
+            README.md \
+            README.es.md \
+            LICENSE
+          shasum -a 256 "dist/monolit-shield-mu-${TAG_NAME}.zip" | awk '{print $1}' > "dist/SHA256.txt"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: monolit-shield-mu-${{ github.ref_name }}
-          path: dist/monolit-shield-mu-${{ github.ref_name }}.zip
+          name: monolit-shield-${{ env.TAG_NAME }}
+          path: dist/*
 
   release:
+    name: Attach assets to Release
     needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: monolit-shield-mu-${{ github.ref_name }}
+          name: monolit-shield-${{ env.TAG_NAME }}
 
-      - name: Create GitHub Release
+      - name: Create/Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: monolit-shield-mu-${{ github.ref_name }}.zip
+          tag_name: ${{ env.TAG_NAME }}
+          files: |
+            monolit-shield-mu-${{ env.TAG_NAME }}.zip
+            SHA256.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
