@@ -1,0 +1,47 @@
+# Monolit Shield – Admin alias + base hardening (Apache)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # 1) /admin-portal root
+  RewriteCond %{REQUEST_URI} ^/admin-portal/?$ [NC]
+  RewriteCond %{HTTP_COOKIE} wordpress_logged_in_ [NC]
+  RewriteRule ^ /wp-admin/ [R=302,L]
+
+  RewriteCond %{REQUEST_URI} ^/admin-portal/?$ [NC]
+  RewriteRule ^ wp-login.php [QSA,L]
+
+  # 2) /admin-portal/... → /wp-admin/...
+  RewriteRule ^admin-portal/(.*)$ wp-admin/$1 [QSA,L]
+
+  # 3) /wp-admin for anonymous → 403 (no redirect)
+  RewriteCond %{REQUEST_URI} ^/wp-admin [NC]
+  RewriteCond %{REQUEST_URI} !^/wp-admin/admin-ajax\.php$ [NC]
+  RewriteCond %{REQUEST_URI} !^/wp-admin/(css/|images/|js/|fonts/) [NC]
+  RewriteCond %{REQUEST_URI} !\.(?:css|js|png|jpe?g|gif|svg|webp|avif|ico|ttf|woff2?)$ [NC]
+  RewriteCond %{HTTP_COOKIE} !wordpress_logged_in_ [NC]
+  RewriteRule ^ - [F,L]
+
+  # 4) Reduce attack surface
+  RewriteCond %{QUERY_STRING} (^|&)author=\d+ [NC]
+  RewriteRule ^ - [F]
+  RewriteCond %{REQUEST_URI} ^/wp-json/wp/v2/users [NC]
+  RewriteRule ^ - [F]
+  RewriteCond %{REQUEST_URI} ^/wp-json/oembed/ [NC]
+  RewriteRule ^ - [F]
+  RewriteRule ^xmlrpc\.php$ - [F]
+
+  # 5) wp-cron.php only POST
+  RewriteCond %{REQUEST_URI} ^/wp-cron\.php$ [NC]
+  RewriteCond %{REQUEST_METHOD} !POST
+  RewriteRule ^ - [F]
+</IfModule>
+
+Options -Indexes
+
+<IfModule mod_headers.c>
+  Header always setifempty X-Content-Type-Options "nosniff"
+  Header always setifempty X-Frame-Options "SAMEORIGIN"
+  Header always setifempty Referrer-Policy "no-referrer-when-downgrade"
+  Header always setifempty Permissions-Policy "geolocation=(), camera=(), microphone=(), payment=(), usb=(), xr-spatial-tracking=()"
+  Header always setifempty Content-Security-Policy-Report-Only "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; img-src 'self' data: blob: https:; font-src 'self' https: data:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://stats.g.doubleclick.net; frame-src 'self' https://www.googletagmanager.com; upgrade-insecure-requests"
+</IfModule>

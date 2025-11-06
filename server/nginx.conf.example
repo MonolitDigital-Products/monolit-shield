@@ -1,0 +1,32 @@
+# Monolit Shield – Admin alias + base hardening (Nginx)
+
+set $is_logged_in 0;
+if ($http_cookie ~* "wordpress_logged_in_") { set $is_logged_in 1; }
+
+location = /admin-portal {
+  if ($is_logged_in) { return 302 /wp-admin/; }
+  rewrite ^ /wp-login.php last;
+}
+
+location ^~ /admin-portal/ {
+  rewrite ^/admin-portal/(.*)$ /wp-admin/$1 last;
+}
+
+location ^~ /wp-admin/ {
+  if ($is_logged_in = 0) {
+    if ($request_uri ~* "^/wp-admin/(admin-ajax\.php|css/|images/|js/|fonts/)") { break; }
+    return 403;
+  }
+  try_files $uri $uri/ /index.php?$args;
+}
+
+location ~* ^/wp-json/wp/v2/users { return 403; }
+location ~* ^/wp-json/oembed/     { return 403; }
+location = /xmlrpc.php            { return 403; }
+
+location = /wp-cron.php {
+  limit_except POST { return 403; }
+  include fastcgi_params;
+  fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+  fastcgi_pass php-fpm;
+}

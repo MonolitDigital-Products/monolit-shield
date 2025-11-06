@@ -1,0 +1,18 @@
+# General
+.DS_Store
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Archives
+*.zip
+*.tar.gz
+
+# Node / Composer (if any in forks)
+node_modules/
+vendor/
+
+# IDE
+.idea/
+.vscode/
